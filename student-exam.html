@@ -439,174 +439,130 @@
                 } catch(e) {}
             }
 
-            // Expose helper to speak the current question, then start listening for the answer
-            window.speakQuestionAndListen = function() {
-                try {
-                    const txt = (questionText && questionText.textContent) || '';
-                    const u = new SpeechSynthesisUtterance(txt);
-                    u.lang = recognition.lang;
-                    try { window.speechSynthesis.cancel(); } catch(e) {}
-                    u.onend = () => { try { recognition.start(); voiceBtn.textContent = "Listening..."; } catch(e) {} };
-                    window.speechSynthesis.speak(u);
-                } catch (e) {
-                    try { recognition.start(); voiceBtn.textContent = "Listening..."; } catch(_) {}
-                }
+            // State for current question reading
+            let currentSpokenIndex = 0;
+            let isReadingQuestion = false;
+
+            function speakCurrentQuestion() {
+                if (isReadingQuestion) return;
+
+                const questionElement = document.getElementById('questionText');
+                if (!questionElement) return;
+
+                isReadingQuestion = true;
+                const textToSpeak = `Question ${currentQuestionIndex + 1}. ${questionElement.textContent}.`;
+
+                speak(textToSpeak);
+
+                setTimeout(() => {
+                    isReadingQuestion = false;
+                }, 2000);
             }
 
             function handleVoiceCommand(lower, rawTextForAnswerPlacement) {
-                const isExamStarted = examQuestions.style.display !== 'none' && startExamBtn.style.display === 'none';
-                const canStart = startExamBtn.style.display !== 'none';
+                lower = lower.trim();
 
-                const text = lower.trim();
-
-                if (
-                    text.includes('start exam') ||
-                    text.includes('begin exam') ||
-                    text === 'start' ||
-                    text === 'begin' ||
-                    text.includes('start test')
-                ) {
-                    if (canStart) { startExamBtn.click(); speak('Exam started'); }
+                // --- Navigation ---
+                if (lower.includes('next question') || lower === 'next' || lower.includes('go to next question')) {
+                    const nextBtn = document.getElementById('nextBtn');
+                    if (nextBtn && !nextBtn.disabled) {
+                        nextBtn.click();
+                        currentQuestionIndex = Math.min(currentQuestionIndex + 1, questions.length - 1);
+                        setTimeout(speakCurrentQuestion, 500);
+                    } else {
+                        speak('This is the last question.');
+                    }
                     return true;
                 }
 
-                if (
-                    text.includes('next question') ||
-                    text === 'next' ||
-                    text.includes('go to next')
-                ) {
-                    if (isExamStarted) { nextBtn.click(); speak('Next question'); }
+                if (lower.includes('previous question') || lower.includes('previous') || lower.includes('go back') || lower === 'back') {
+                    const prevBtn = document.getElementById('prevBtn');
+                    if (prevBtn && !prevBtn.disabled) {
+                        prevBtn.click();
+                        currentQuestionIndex = Math.max(0, currentQuestionIndex - 1);
+                        setTimeout(speakCurrentQuestion, 500);
+                    } else {
+                        speak('This is the first question.');
+                    }
                     return true;
                 }
 
-                if (
-                    text.includes('previous question') ||
-                    text === 'previous' ||
-                    text === 'back' ||
-                    text.includes('go to previous')
-                ) {
-                    if (isExamStarted) { prevBtn.click(); speak('Previous question'); }
+                // --- Read / repeat ---
+                if (lower.includes('read question') || lower.includes('repeat question') ||
+                    lower.includes('question again') || lower === 'read') {
+                    speakCurrentQuestion();
                     return true;
                 }
 
-                if (
-                    text.includes('submit exam') ||
-                    text === 'submit' ||
-                    text === 'finish'
-                ) {
-                    if (isExamStarted) { submitExamBtn.click(); speak('Ready to submit'); }
+                // --- Option-style selection (store letter in answer box) ---
+                if (lower.startsWith('select option ')) {
+                    const letter = lower.replace('select option', '').trim().charAt(0);
+                    if (letter && /[a-d]/i.test(letter)) {
+                        const upper = letter.toUpperCase();
+                        answerInput.value = upper;
+                        answers[currentQuestionIndex] = upper;
+                        speak(`Option ${upper} selected.`);
+                        return true;
+                    }
+                }
+
+                // Just say "A", "B", "C", or "D"
+                if (/^[a-d]$/.test(lower)) {
+                    const upper = lower.toUpperCase();
+                    answerInput.value = upper;
+                    answers[currentQuestionIndex] = upper;
+                    speak(`Option ${upper} selected.`);
                     return true;
                 }
 
-                // Option selection commands: "option d", "choose b", "select 3", etc.
-                // Works only when exam is started
-                if (isExamStarted) {
-                    const optionMatch = text.match(/^(?:option|answer|choose|select)\s+([a-d]|[1-9])/);
-                    if (optionMatch) {
-                        let token = optionMatch[1];
-                        // Map digits 1-4 to A-D if applicable
-                        if (/^[1-9]$/.test(token)) {
-                            const num = parseInt(token, 10);
-                            if (num >= 1 && num <= 4) {
-                                token = String.fromCharCode('A'.charCodeAt(0) + (num - 1));
-                            }
-                        } else {
-                            token = token.toUpperCase();
-                        }
-                        answerInput.value = token;
-                        answers[currentQuestionIndex] = answerInput.value;
-                        speak(`Recorded option ${token}`);
-                        // Auto-advance to next question after brief delay
+                // --- Basic exam controls ---
+                if (lower.includes('start exam')) {
+                    const btn = document.getElementById('startExamBtn');
+                    if (btn) {
+                        btn.click();
                         setTimeout(() => {
-                            if (currentQuestionIndex < questions.length - 1) {
-                                nextBtn.click();
-                            } else {
-                                document.getElementById("submitConfirmModal").style.display = "block";
-                            }
-                        }, 150);
-                        return true;
+                            currentQuestionIndex = 0;
+                            speakCurrentQuestion();
+                        }, 800);
                     }
-
-                    // Hands-free dictation: "answer Paris" -> sets answer text and stays or moves next
-                    const freeAnswerMatch = text.match(/^answer\s+(.+)/);
-                    if (freeAnswerMatch) {
-                        // Prefer original casing if provided
-                        const original = rawTextForAnswerPlacement || freeAnswerMatch[1];
-                        // If raw transcript starts with 'answer ', strip only that prefix to keep casing for the rest
-                        const originalStripped = original.replace(/^\s*answer\s+/i, '');
-                        answerInput.value = originalStripped;
-                        answers[currentQuestionIndex] = answerInput.value;
-                        speak('Recorded answer');
-                        // Auto-advance similar to option selection
-                        setTimeout(() => {
-                            if (currentQuestionIndex < questions.length - 1) {
-                                nextBtn.click();
-                            } else {
-                                document.getElementById("submitConfirmModal").style.display = "block";
-                            }
-                        }, 150);
-                        return true;
-                    }
-
-                    if (text === 'read question' || text === 'repeat question') {
-                        speak(questionText.textContent || '');
-                        return true;
-                    }
-                    if (text === 'read answer' || text === 'repeat answer') {
-                        speak(answerInput.value || 'No answer yet');
-                        return true;
-                    }
-                    if (text === 'clear answer' || text === 'delete answer' || text === 'erase answer') {
-                        answerInput.value = '';
-                        answers[currentQuestionIndex] = '';
-                        speak('Answer cleared');
-                        return true;
-                    }
-                    if (text === 'delete last word' || text === 'remove last word') {
-                        const parts = answerInput.value.trim().split(/\s+/);
-                        parts.pop();
-                        answerInput.value = parts.join(' ');
-                        answers[currentQuestionIndex] = answerInput.value;
-                        speak('Last word deleted');
-                        return true;
-                    }
-                    const appendMatch = text.match(/^append\s+(.+)/);
-                    if (appendMatch) {
-                        const addText = (rawTextForAnswerPlacement || appendMatch[1]).replace(/^\s*append\s+/i, '');
-                        answerInput.value = (answerInput.value ? answerInput.value + ' ' : '') + addText;
-                        answers[currentQuestionIndex] = answerInput.value;
-                        speak('Appended');
-                        return true;
-                    }
-                    const setMatch = text.match(/^(?:set answer to|set to)\s+(.+)/);
-                    if (setMatch) {
-                        const newText = (rawTextForAnswerPlacement || setMatch[1]).replace(/^\s*(?:set answer to|set to)\s+/i, '');
-                        answerInput.value = newText;
-                        answers[currentQuestionIndex] = answerInput.value;
-                        speak('Answer updated');
-                        return true;
-                    }
-                    const replaceMatch = text.match(/^replace\s+(.+)\s+with\s+(.+)/);
-                    if (replaceMatch) {
-                        const fromRaw = replaceMatch[1];
-                        const toRaw = replaceMatch[2];
-                        const current = answerInput.value;
-                        const pattern = new RegExp(fromRaw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-                        answerInput.value = current.replace(pattern, toRaw);
-                        answers[currentQuestionIndex] = answerInput.value;
-                        speak('Replaced');
-                        return true;
-                    }
+                    return true;
                 }
 
-                // Not a command: treat as dictated answer if provided a raw text
+                if (lower.includes('submit exam')) {
+                    const btn = document.getElementById('submitExamBtn');
+                    if (btn) btn.click();
+                    return true;
+                }
+
+                if (lower.includes('confirm submit')) {
+                    const btn = document.getElementById('confirmSubmitBtn');
+                    if (btn) btn.click();
+                    return true;
+                }
+
+                if (lower.includes('cancel submit')) {
+                    const btn = document.getElementById('cancelSubmitBtn');
+                    if (btn) btn.click();
+                    return true;
+                }
+
+                if (lower.includes('help') || lower.includes('what can i say')) {
+                    speak("You can say: read question, select option A, B, C or D, next question, previous question, submit exam, or help.");
+                    return true;
+                }
+
+                // If nothing matched, treat full speech as free-text answer
                 if (rawTextForAnswerPlacement) {
                     answerInput.value = rawTextForAnswerPlacement;
+                    answers[currentQuestionIndex] = answerInput.value;
+                    speak('Answer recorded.');
+                    return true;
                 }
+
                 return false;
             }
 
-            // Global continuous command recognition (voice control)
+            // Always-on command recognition after first user interaction
             let commandRecognition;
             try {
                 commandRecognition = new SpeechRecognition();
@@ -614,7 +570,6 @@
                 commandRecognition.interimResults = false;
                 commandRecognition.lang = recognition.lang;
 
-                // Start listening after first user interaction to satisfy browser mic policies
                 const initVoiceControlOnce = () => {
                     try { commandRecognition.start(); } catch (e) {}
                     document.body.removeEventListener('click', initVoiceControlOnce);
@@ -624,7 +579,6 @@
                 document.body.addEventListener('keydown', initVoiceControlOnce);
 
                 commandRecognition.onresult = (event) => {
-                    // Process the latest final result
                     const res = event.results[event.results.length - 1];
                     if (res && res.isFinal) {
                         const transcript = res[0].transcript || '';
@@ -632,9 +586,8 @@
                         handleVoiceCommand(lower, transcript);
                     }
                 };
-                commandRecognition.onerror = () => { /* keep silent to avoid UI noise */ };
+                commandRecognition.onerror = () => {};
                 commandRecognition.onend = () => {
-                    // Auto-restart to remain always-on for commands
                     try { commandRecognition.start(); } catch (e) {}
                 };
             } catch (e) {
@@ -649,7 +602,6 @@
             recognition.onresult = (event) => {
                 const speechResult = event.results[0][0].transcript;
                 const lower = speechResult.trim().toLowerCase();
-                // Try commands first; if none, place as answer text
                 handleVoiceCommand(lower, speechResult);
                 voiceBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak Answer';
             };
@@ -660,7 +612,6 @@
             };
 
             recognition.onend = () => {
-                // Ensure UI resets even if there was no speech
                 voiceBtn.innerHTML = '<i class="fas fa-microphone"></i> Speak Answer';
             };
         } else {

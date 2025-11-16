@@ -248,7 +248,13 @@ function executeCommand(commandType, transcript) {
         case 'next':
             if (typeof nextQuestion === 'function') {
                 speak(LANGUAGES[currentLanguage].messages.nextQuestion);
+                const prevIndex = (window.currentExamState && window.currentExamState.currentQuestionIndex) || 0;
                 nextQuestion();
+                // After DOM updates, read the next question
+                setTimeout(() => {
+                    // If index changed or question updated, read
+                    readCurrentQuestion();
+                }, 200);
             }
             break;
             
@@ -256,6 +262,7 @@ function executeCommand(commandType, transcript) {
             if (typeof previousQuestion === 'function') {
                 speak(LANGUAGES[currentLanguage].messages.previousQuestion);
                 previousQuestion();
+                setTimeout(() => { readCurrentQuestion(); }, 200);
             }
             break;
             
@@ -360,6 +367,14 @@ function selectOptionByVoice(index) {
             });
             speak(message);
         }
+    }
+
+    // Auto-advance to next question after a short delay and read it
+    if (typeof nextQuestion === 'function') {
+        setTimeout(() => {
+            nextQuestion();
+            setTimeout(() => { readCurrentQuestion(); }, 200);
+        }, 250);
     }
 }
 

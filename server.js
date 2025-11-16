@@ -15,6 +15,7 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // MongoDB Connection
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/autoscribe', {
@@ -26,6 +27,7 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/autoscrib
 const User = require('./models/User');
 const Exam = require('./models/Exam');
 const ScheduledExam = require('./models/ScheduledExam');
+const Attempt = require('./models/Attempt');
 
 // Authentication Middleware
 const authenticateToken = (req, res, next) => {
@@ -70,6 +72,17 @@ app.post('/api/register', async (req, res) => {
         
         await user.save();
         res.status(201).json({ message: 'User created successfully' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Current user info
+app.get('/api/me', authenticateToken, async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id).select('-password');
+        if (!user) return res.status(404).json({ message: 'User not found' });
+        res.json(user);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -137,6 +150,20 @@ app.get('/api/exams', authenticateToken, async (req, res) => {
     }
 });
 
+// Get a single exam by ID
+app.get('/api/exams/:id', authenticateToken, async (req, res) => {
+    try {
+        const exam = await Exam.findById(req.params.id);
+        if (!exam) return res.status(404).json({ message: 'Exam not found' });
+        if (exam.status !== 'published' && String(exam.teacher) !== req.user.id) {
+            return res.status(403).json({ message: 'Forbidden' });
+        }
+        res.json(exam);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Scheduled Exams
 app.post('/api/scheduled-exams', authenticateToken, async (req, res) => {
     try {
@@ -152,6 +179,55 @@ app.post('/api/scheduled-exams', authenticateToken, async (req, res) => {
         
         await scheduledExam.save();
         res.status(201).json(scheduledExam);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Submit an exam attempt with automatic scoring
+app.post('/api/attempts', authenticateToken, async (req, res) => {
+    try {
+        const { examId, answers } = req.body;
+        const exam = await Exam.findById(examId);
+        if (!exam) return res.status(404).json({ message: 'Exam not found' });
+
+        let score = 0;
+        let totalMarks = 0;
+        const byQ = new Map();
+        (answers || []).forEach(a => byQ.set(String(a.questionId), a));
+
+        const detailed = [];
+        exam.questions.forEach((q, idx) => {
+            const marks = typeof q.marks === 'number' ? q.marks : 1;
+            totalMarks += marks;
+            const a = byQ.get(String(idx + 1)) || {};
+            let awarded = 0;
+            if (Array.isArray(q.options) && q.options.length) {
+                const correctIndex = q.options.findIndex(o => !!o.isCorrect);
+                if (typeof a.selectedIndex === 'number' && a.selectedIndex === correctIndex) {
+                    awarded = marks;
+                }
+            } else if (q.correctAnswer) {
+                const norm = s => String(s || '').trim().toLowerCase();
+                if (norm(a.freeText) && norm(a.freeText) === norm(q.correctAnswer)) awarded = marks;
+            }
+            score += awarded;
+            detailed.push({ questionId: idx + 1, selectedIndex: a.selectedIndex, freeText: a.freeText, marksAwarded: awarded });
+        });
+
+        const attempt = new Attempt({ student: req.user.id, exam: exam._id, answers: detailed, score, totalMarks, submittedAt: new Date() });
+        await attempt.save();
+        res.status(201).json({ attemptId: attempt._id, score, totalMarks, percentage: Math.round((score/totalMarks)*100) });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// List attempts for current user
+app.get('/api/my-attempts', authenticateToken, async (req, res) => {
+    try {
+        const attempts = await Attempt.find({ student: req.user.id }).sort({ submittedAt: -1 });
+        res.json(attempts);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

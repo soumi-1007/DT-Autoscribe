@@ -94,23 +94,7 @@
                         </div>
                     </div>
 
-                    <div class="dashboard-card mock-exam-card">
-                        <div class="card-header">
-                            <h3><i class="fas fa-graduation-cap"></i> Practice Mock Exam</h3>
-                        </div>
-                        <div class="card-content">
-                            <div class="mock-exam-info">
-                                <p><i class="fas fa-microphone"></i> <strong>Voice-Enabled Exam</strong></p>
-                                <p><i class="fas fa-volume-up"></i> Questions read aloud</p>
-                                <p><i class="fas fa-question-circle"></i> 5 Questions (10 marks)</p>
-                                <p><i class="fas fa-clock"></i> 10 Minutes</p>
-                                <p><i class="fas fa-star"></i> Perfect for practice!</p>
-                            </div>
-                            <button class="action-btn mock-exam-btn" onclick="startMockExam()" style="background: linear-gradient(135deg, #86efac 0%, #bbf7d0 100%); font-weight: 700; margin-top: 10px;">
-                                <i class="fas fa-play-circle"></i> Start Mock Exam
-                            </button>
-                        </div>
-                    </div>
+                    
 
                     <div class="dashboard-card quick-actions">
                         <div class="card-header">
@@ -199,57 +183,7 @@
             </section>
 
 
-            <!-- Mock Exam Interface (initially hidden) -->
-            <div id="mock-exam-interface" class="content-section" style="display: none;">
-                <div class="card">
-                    <div class="exam-header">
-                        <h2 id="mock-exam-title">Mock Exam</h2>
-                        <div class="exam-timer" id="mock-exam-timer">10:00</div>
-                    </div>
-                    
-                    <div class="question-container">
-                        <div class="question-header">
-                            <span class="question-number">Question <span id="mock-current-q">1</span>/<span id="mock-total-questions">5</span></span>
-                            <span class="question-marks">(2 marks)</span>
-                        </div>
-                        <p class="question-text" id="mock-question-text">Loading question...</p>
-                        
-                        <div class="options-container" id="mock-options-container">
-                            <!-- Options will be populated by JavaScript -->
-                        </div>
-                        
-                        <div class="voice-input-section">
-                            <button class="voice-btn" id="mock-voice-btn">
-                                <i class="fas fa-microphone"></i> Speak Answer
-                            </button>
-                            <div class="voice-status" id="mock-voice-status">
-                                <i class="fas fa-circle"></i> Ready
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="exam-navigation">
-                        <button class="btn btn-secondary" id="mock-prev-btn" onclick="previousQuestion()">
-                            <i class="fas fa-arrow-left"></i> Previous
-                        </button>
-                        <div class="question-progress">
-                            <span id="mock-current-position">1</span> of <span id="mock-total-questions-display">5</span>
-                        </div>
-                        <button class="btn btn-primary" id="mock-next-btn" onclick="nextQuestion()">
-                            Next <i class="fas fa-arrow-right"></i>
-                        </button>
-                    </div>
-                    
-                    <div class="exam-actions">
-                        <button class="btn btn-danger" onclick="endMockExam()">
-                            <i class="fas fa-flag"></i> End Exam
-                        </button>
-                        <button class="btn btn-success" id="mock-submit-exam-btn" onclick="submitMockExam()">
-                            <i class="fas fa-check-circle"></i> Submit Exam
-                        </button>
-                    </div>
-                </div>
-            </div>
+            
 
             <!-- Exam Section -->
             <section id="exam-section-instructions" class="content-section">
@@ -405,7 +339,5 @@
     <script src="multilingual-voice.js"></script>
     <script src="script.js"></script>
     <script src="student-script.js"></script>
-    <script src="mock-exam.js"></script>
-    <script src="enhanced-mock-exam.js"></script>
 </body>
 </html>

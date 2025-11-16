@@ -23,22 +23,28 @@
         <main class="main-content">
             <div class="login-container">
                 <div class="login-options">
-                    <div class="login-card teacher-card" onclick="showLogin('teacher')">
+                    <div class="login-card teacher-card" onclick="showLogin('teacher'); if (window.startVoiceLogin) startVoiceLogin('teacher');">
                         <div class="card-icon">
                             <i class="fas fa-chalkboard-teacher"></i>
                         </div>
                         <h2>Teacher Login</h2>
                         <p>Manage exams, upload papers, and track student progress</p>
                         <button class="login-btn">Login as Teacher</button>
+                        <button type="button" class="login-btn" style="margin-top:8px;background:#111827;color:#fff" onclick="event.stopPropagation(); if (window.startVoiceLogin) startVoiceLogin('teacher');">
+                            <i class="fas fa-microphone"></i> Use Voice Login
+                        </button>
                     </div>
 
-                    <div class="login-card student-card" onclick="showLogin('student')">
+                    <div class="login-card student-card" onclick="showLogin('student'); if (window.startVoiceLogin) startVoiceLogin('student');">
                         <div class="card-icon">
                             <i class="fas fa-user-graduate"></i>
                         </div>
                         <h2>Student Login</h2>
                         <p>Voice-driven exam experience for accessible learning</p>
                         <button class="login-btn">Login as Student</button>
+                        <button type="button" class="login-btn" style="margin-top:8px;background:#111827;color:#fff" onclick="event.stopPropagation(); if (window.startVoiceLogin) startVoiceLogin('student');">
+                            <i class="fas fa-microphone"></i> Use Voice Login
+                        </button>
                     </div>
 
                 </div>

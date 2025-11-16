@@ -226,6 +226,17 @@ function loadExamQuestions(exam) {
     // Start timer
     startExamTimer(exam.duration * 60);
 
+    // Auto-enable voice mode if available and currently off
+    try {
+        const voiceStatus = document.getElementById('voice-status');
+        if (voiceStatus && typeof window.toggleVoiceMode === 'function') {
+            const text = (voiceStatus.textContent || '').toLowerCase();
+            if (text.includes('voice mode: off')) {
+                window.toggleVoiceMode();
+            }
+        }
+    } catch (_) {}
+
     // Speak exam instructions using multilingual system
     if (window.formatMessage) {
         const welcomeMsg = window.formatMessage('welcome', {
@@ -408,15 +419,19 @@ function submitCurrentExam() {
     // Save submission
     saveStudentSubmission(exam.id, currentUser.id, answers, `${score}/${totalMarks}`);
 
-    // Show result
-    alert(`Exam submitted!\n\nYour Score: ${score}/${totalMarks} (${percentage}%)`);
-
-    // Return to dashboard
-    document.getElementById('exam-section').classList.remove('active');
-    document.getElementById('dashboard-section').classList.add('active');
-
-    // Reload exams
-    loadStudentExams();
+    // Speak and show result, then auto-logout
+    const resultText = `Exam submitted. Your score is ${score} out of ${totalMarks}, which is ${percentage} percent. You will be logged out now.`;
+    try { if (window.speechSynthesis) { try { window.speechSynthesis.cancel(); } catch(e) {} } } catch(_){ }
+    if (typeof window.speak === 'function') {
+        window.speak(resultText, () => {
+            try { if (window.AutoscribeUtils) { window.AutoscribeUtils.clearUserData(); } } catch(_){ }
+            window.location.href = 'index.html';
+        });
+    } else {
+        alert(`Exam submitted!\n\nYour Score: ${score}/${totalMarks} (${percentage}%)`);
+        try { if (window.AutoscribeUtils) { window.AutoscribeUtils.clearUserData(); } } catch(_){ }
+        window.location.href = 'index.html';
+    }
 }
 
 // Initialize on page load
